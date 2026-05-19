@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>520黑客Galgame</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;user-select:none;}
+        body{
+            width:100vw;
+            height:100vh;
+            overflow:hidden;
+            background:#0a0a0a;
+            font-family:"Microsoft Yahei",sans-serif;
+        }
+        .game-box{
+            width:100%;
+            height:100%;
+            position:relative;
+        }
+        .char-img{
+            position:absolute;
+            bottom:180px;
+            left:50%;
+            transform:translateX(-50%);
+            height:60vh;
+            transition:all 0.3s ease;
+            z-index:1;
+        }
+        @keyframes charJump{
+            0%,100%{transform:translateX(-50%) translateY(0);}
+            50%{transform:translateX(-50%) translateY(-8px);}
+        }
+        .talking{
+            animation:charJump 0.4s infinite ease-in-out;
+        }
+        .dialog-box{
+            position:absolute;
+            bottom:0;
+            left:0;
+            width:100%;
+            height:180px;
+            background:rgba(0,0,0,0.9);
+            border-top:3px solid #00ff88;
+            padding:20px 40px;
+            color:#ffffff;
+            font-size:22px;
+            line-height:1.8;
+            z-index:10;
+        }
+        .char-name{
+            color:#00ff88;
+            font-weight:bold;
+            margin-bottom:10px;
+            font-size:24px;
+        }
+        .choice-box{
+            position:absolute;
+            bottom:200px;
+            left:50%;
+            transform:translateX(-50%);
+            display:flex;
+            gap:20px;
+            z-index:15;
+        }
+        .choice-btn{
+            padding:12px 30px;
+            background:rgba(0,255,136,0.2);
+            border:2px solid #00ff88;
+            color:#00ff88;
+            font-size:18px;
+            cursor:pointer;
+            transition:all 0.2s ease;
+            border-radius:4px;
+        }
+        .choice-btn:hover{
+            background:#00ff88;
+            color:#000;
+        }
+        .tip-text{
+            position:absolute;
+            bottom:190px;
+            right:40px;
+            color:#aaa;
+            font-size:16px;
+            animation:fade 1s infinite;
+            z-index:10;
+        }
+        @keyframes fade{
+            0%,100%{opacity:0.3;}
+            50%{opacity:1;}
+        }
+        .jump-scare{
+            position:absolute;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            background:#000;
+            z-index:100;
+            display:none;
+        }
+        .jump-scare img{
+            width:100%;
+            height:100%;
+            object-fit:cover;
+        }
+        .ending-screen{
+            position:absolute;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            background:#000;
+            z-index:100;
+            display:none;
+            text-align:center;
+        }
+        .ending-screen img{
+            width:100%;
+            height:85%;
+            object-fit:contain;
+            margin-top:20px;
+        }
+        .ending-text{
+            color:#ff69b4;
+            font-size:36px;
+            font-weight:bold;
+            margin-top:15px;
+            text-shadow:0 0 10px #ff69b4;
+        }
+        .game-over-text{
+            color:#ff0000;
+            font-size:48px;
+            font-weight:bold;
+            position:absolute;
+            top:50%;
+            left:50%;
+            transform:translate(-50%,-50%);
+            text-shadow:0 0 20px #ff0000;
+            z-index:101;
+            display:none;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-box" id="game">
+        <img class="char-img" id="charImg" src="hacker_normal.png" alt="黑客">
+        <div class="dialog-box">
+            <div class="char-name" id="charName">黑客</div>
+            <div id="dialogText"></div>
+        </div>
+        <div class="choice-box" id="choiceBox" style="display:none;">
+            <button class="choice-btn" id="choice1">什么都不做</button>
+            <button class="choice-btn" id="choice2">向他表白</button>
+        </div>
+        <div class="tip-text" id="tipText">点击画面继续</div>
+        <div class="jump-scare" id="jumpScare">
+            <img src="jump_scare.png" alt="跳脸杀">
+        </div>
+        <div class="ending-screen" id="goodEnding">
+            <img src="wedding_ending.png" alt="婚纱照">
+            <div class="ending-text">好结局 · 成婚结局</div>
+        </div>
+        <div class="game-over-text" id="gameOver">游戏结束</div>
+    </div>
+
+    <audio id="bgm" loop preload="auto">
+        <source src="bgm.mp3" type="audio/mpeg">
+    
+    <audio id="typeSound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3" type="audio/mpeg">
+    
+    <audio id="scareSound" preload="auto">
+        <source src="scare_sound.mp3" type="audio/mpeg">
+    
+
+    <script>
+        const TYPE_SPEED = 60;
+        const BGM_VOLUME = 0.4;
+
+        let nowIndex = 0;
+        let typingLock = false;
+        let gamePhase = "dialog";
+        const charImg = document.getElementById("charImg");
+        const charName = document.getElementById("charName");
+        const dialogText = document.getElementById("dialogText");
+        const choiceBox = document.getElementById("choiceBox");
+        const tipText = document.getElementById("tipText");
+        const jumpScare = document.getElementById("jumpScare");
+        const goodEnding = document.getElementById("goodEnding");
+        const gameOver = document.getElementById("gameOver");
+        const bgmAudio = document.getElementById("bgm");
+        const typeAudio = document.getElementById("typeSound");
+        const scareAudio = document.getElementById("scareSound");
+        const gameBox = document.getElementById("game");
+
+        const storyData = [
+            {name:"黑客",text:"今天是520，你有什么想对我说的吗？",img:"hacker_normal.png"}
+        ];
+
+        function initGame(){
+            bgmAudio.volume = BGM_VOLUME;
+            scareAudio.volume = 1;
+            showDialog(nowIndex);
+        }
+
+        function showDialog(index){
+            if(index >= storyData.length){
+                showChoices();
+                return;
+            }
+            typingLock = true;
+            let data = storyData[index];
+            charName.innerText = data.name;
+            charImg.src = data.img;
+            dialogText.innerText = "";
+            charImg.classList.add("talking");
+
+            let wordIndex = 0;
+            let text = data.text;
+            let typeTimer = setInterval(()=>{
+                if(wordIndex >= text.length){
+                    clearInterval(typeTimer);
+                    typingLock = false;
+                    charImg.classList.remove("talking");
+                    return;
+                }
+                dialogText.innerHTML += text[wordIndex];
+                typeAudio.currentTime = 0;
+                typeAudio.play().catch(()=>{});
+                wordIndex++;
+            },TYPE_SPEED);
+        }
+
+        function showChoices(){
+            gamePhase = "choice";
+            tipText.style.display = "none";
+            choiceBox.style.display = "flex";
+        }
+
+        // 坏结局
+        document.getElementById("choice1").addEventListener("click",()=>{
+            gamePhase = "end";
+            choiceBox.style.display = "none";
+            charImg.src = "hacker_angry.png";
+            charImg.classList.add("talking");
+            dialogText.innerText = "";
+            let angryText = "你居然什么都不说？！";
+            let wordIndex = 0;
+            let typeTimer = setInterval(()=>{
+                if(wordIndex >= angryText.length){
+                    clearInterval(typeTimer);
+                    charImg.classList.remove("talking");
+                    setTimeout(()=>{
+                        scareAudio.currentTime = 0;
+                        scareAudio.play().catch(()=>{});
+                        jumpScare.style.display = "block";
+                        setTimeout(()=>gameOver.style.display = "block",1500);
+                    },800);
+                    return;
+                }
+                dialogText.innerHTML += angryText[wordIndex];
+                typeAudio.currentTime = 0;
+                typeAudio.play().catch(()=>{});
+                wordIndex++;
+            },TYPE_SPEED);
+        });
+
+        // 好结局（已彻底修复选项重复BUG）
+        document.getElementById("choice2").addEventListener("click",()=>{
+            gamePhase = "end"; // 直接锁定终局，禁止任何选项弹出
+            choiceBox.style.display = "none";
+            charImg.src = "hacker_blush.png";
+
+            // 完整温柔剧情台词
+            const lines = [
+                "噶啦Game里面不是这样的，你该先送我小礼物，每天陪我说话刷好感，不能这样直接表白。",
+                "（脸颊泛红，小声低头）不过……算了啦。",
+                "好吧，那我就同意你的心意了。",
+                "从今往后，你一定要好好对待我才行。"
+            ];
+
+            let lineIdx = 0;
+            function nextLine(){
+                if(lineIdx >= lines.length){
+                    setTimeout(()=>goodEnding.style.display = "block",1000);
+                    return;
+                }
+                typingLock = true;
+                charImg.classList.add("talking");
+                dialogText.innerText = "";
+                let txt = lines[lineIdx];
+                let wdIdx = 0;
+                let timer = setInterval(()=>{
+                    if(wdIdx >= txt.length){
+                        clearInterval(timer);
+                        typingLock = false;
+                        charImg.classList.remove("talking");
+                        lineIdx++;
+                        gameBox.onclick = ()=>nextLine();
+                        return;
+                    }
+                    dialogText.innerHTML += txt[wdIdx];
+                    typeAudio.currentTime = 0;
+                    typeAudio.play().catch(()=>{});
+                    wdIdx++;
+                },TYPE_SPEED);
+            }
+            nextLine();
+        });
+
+        // 初始唯一点击逻辑
+        gameBox.addEventListener("click",()=>{
+            if(gamePhase !== "dialog" || typingLock) return;
+            nowIndex++;
+            showDialog(nowIndex);
+        },{once:true});
+
+        document.addEventListener("click",()=>bgmAudio.play().catch(()=>{}),{once:true});
+        initGame();
+    </script>
+</body>
+</html>
